@@ -37,7 +37,6 @@ def parse_referrers(var_name: str, defaults: list):
 
 
 def parse_list(var_name: str, defaults: list):
-    # Check singular and plural variable names
     raw_val = os.getenv(var_name, "").strip()
     if not raw_val and not var_name.endswith("S"):
         raw_val = os.getenv(f"{var_name}S", "").strip()
@@ -46,8 +45,42 @@ def parse_list(var_name: str, defaults: list):
 
     if not raw_val:
         return defaults
-    items = [item.strip().lower() for item in raw_val.split(",") if item.strip()]
+    items = [item.strip() for item in raw_val.split(",") if item.strip()]
     return items if items else defaults
+
+
+# ---------------------------------------------------------
+# User-Agent Pools & Parsers
+# ---------------------------------------------------------
+DEFAULT_DESKTOP_UAS = [
+    # Windows 10 / 11 - Chrome
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+    # Windows 10 / 11 - Edge
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0",
+    # Windows 10 / 11 - Firefox
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
+    # macOS - Chrome
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+    # macOS - Safari
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+    # macOS - Firefox
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0"
+]
+
+DEFAULT_MOBILE_UAS = [
+    # iPhone iOS 18 - Mobile Safari
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1",
+    # iPhone iOS 17 - Chrome Mobile
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/134.0.0.0 Mobile/15E148 Safari/604.1",
+    # Android 14 (Samsung Galaxy) - Chrome Mobile
+    "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36",
+    # Android 14 (Google Pixel) - Chrome Mobile
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36"
+]
+
+# Allow custom UA overrides via environment variables
+DESKTOP_UAS = parse_list("DESKTOP_USER_AGENTS", DEFAULT_DESKTOP_UAS)
+MOBILE_UAS = parse_list("MOBILE_USER_AGENTS", DEFAULT_MOBILE_UAS)
 
 
 # ---------------------------------------------------------
@@ -65,11 +98,11 @@ CYCLE_MIN, CYCLE_MAX = parse_range("CYCLE_INTERVAL_RANGE", 50.0, 70.0)
 # Browser Rendering Toggle ("true" or "false")
 BROWSER_RENDERING = os.getenv("BROWSER_RENDERING", "true").strip().lower()
 
-# Device Types: Reads DEVICE_TYPE or DEVICE_TYPES (e.g. "mobile" or "desktop,mobile")
+# Device Types: Reads DEVICE_TYPE or DEVICE_TYPES
 DEFAULT_DEVICES = ["desktop", "mobile"]
-DEVICE_TYPES = parse_list("DEVICE_TYPE", DEFAULT_DEVICES)
+DEVICE_TYPES = [d.lower() for d in parse_list("DEVICE_TYPE", DEFAULT_DEVICES)]
 
-# Default Referrers (Includes "none" for direct traffic)
+# Referrers (Includes "none" for direct traffic)
 DEFAULT_REFERRERS = [
     "none",
     "https://app.bullpen.fi/",
@@ -212,32 +245,48 @@ def execute_bot(bot_id: int, total_bots: int, target_url: str, slug: str, ltype:
     tier, label, code = pick_country()
     chosen_device = random.choice(DEVICE_TYPES)
 
+    # Select explicit User-Agent and friendly OS label
+    if chosen_device == "mobile":
+        selected_ua = random.choice(MOBILE_UAS)
+        os_label = "iOS" if "iPhone" in selected_ua else "Android"
+    else:
+        chosen_device = "desktop"
+        selected_ua = random.choice(DESKTOP_UAS)
+        if "Windows" in selected_ua:
+            os_label = "Windows"
+        elif "Macintosh" in selected_ua:
+            os_label = "macOS"
+        else:
+            os_label = "Desktop"
+
     # ScraperAPI query parameters
     params = {
         "api_key": key_obj.token,
-        "url": target_url,
-        "render": BROWSER_RENDERING,
+        "device_type": chosen_device,
         "country_code": code,
-        "device_type": chosen_device
+        "render": BROWSER_RENDERING,
+        "keep_headers": "true",
+        "url": target_url
     }
 
-    # Pick a random referrer
-    chosen_referrer = random.choice(REFERRERS)
-    headers = {}
+    url = f"http://api.scraperapi.com?{urllib.parse.urlencode(params)}"
+    
+    headers = {
+        "User-Agent": selected_ua
+    }
 
+    chosen_referrer = random.choice(REFERRERS)
     if chosen_referrer and chosen_referrer.lower() not in ("none", "direct", "empty"):
         headers["Referer"] = chosen_referrer
-        params["keep_headers"] = "true"
         ref_display = chosen_referrer
     else:
         ref_display = "None (Direct)"
 
-    url = f"http://api.scraperapi.com?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url, headers=headers)
 
     try:
         with urllib.request.urlopen(req, timeout=65) as resp:
-            print(f"[Bot-{bot_id}/{total_bots}] [{tier}-{label}] [{chosen_device.upper()}] [{ltype} {slug}] [Ref: {ref_display}] [{key_obj.tag}] -> HTTP {resp.status} OK")
+            print(f"[Bot-{bot_id}/{total_bots}] [{tier}-{label}] [{chosen_device.upper()}:{os_label}] [{ltype} {slug}] [Ref: {ref_display}] [{key_obj.tag}] -> HTTP {resp.status} OK")
 
     except urllib.error.HTTPError as e:
         raw_detail = e.read().decode("utf-8", errors="ignore")[:70].strip()
@@ -246,7 +295,7 @@ def execute_bot(bot_id: int, total_bots: int, target_url: str, slug: str, ltype:
             reason_msg = f"HTTP {e.code} Credits Exhausted / Invalid ScraperAPI Key ({raw_detail})"
             pool.mark_dead(key_obj, reason_msg)
         elif e.code == 429:
-            print(f"[Bot-{bot_id}] [{key_obj.tag}] [TRANSIENT] HTTP 429 Rate / Concurrency limit exceeded: {raw_detail}")
+            print(f"[Bot-{bot_id}] [{key_obj.tag}] [TRANSIENT] HTTP 429 Rate limit exceeded: {raw_detail}")
         elif e.code == 404:
             print(f"[Bot-{bot_id}] [{key_obj.tag}] [TRANSIENT] HTTP 404 Route unreachable: {raw_detail}")
         elif e.code == 500:
@@ -270,6 +319,8 @@ def main():
     print(f"Total Active Keys    : {len(pool.active_keys)}")
     print(f"Browser Rendering    : {BROWSER_RENDERING}")
     print(f"Device Types Allowed : {DEVICE_TYPES}")
+    print(f"Desktop UA Count     : {len(DESKTOP_UAS)} registered")
+    print(f"Mobile UA Count      : {len(MOBILE_UAS)} registered")
     print(f"Configured Referrers : {len(REFERRERS)} options (including direct/none)")
     print(f"Workers Per Cycle    : {int(WORKER_MIN)} - {int(WORKER_MAX)}")
     print(f"Worker Gap Range     : {GAP_MIN:.1f}s - {GAP_MAX:.1f}s")
