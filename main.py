@@ -50,37 +50,104 @@ def parse_list(var_name: str, defaults: list):
 
 
 # ---------------------------------------------------------
-# User-Agent Pools & Parsers
+# Realistic User-Agent Pools (Varied OS & Browser Versions)
 # ---------------------------------------------------------
-DEFAULT_DESKTOP_UAS = [
-    # Windows 10 / 11 - Chrome
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-    # Windows 10 / 11 - Edge
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0",
-    # Windows 10 / 11 - Firefox
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
-    # macOS - Chrome
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-    # macOS - Safari
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
-    # macOS - Firefox
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0"
+# Windows 10 & 11 across Chrome, Edge, and Firefox (v140-151)
+WINDOWS_UAS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:150.0) Gecko/20100101 Firefox/150.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0"
 ]
 
-DEFAULT_MOBILE_UAS = [
-    # iPhone iOS 18 - Mobile Safari
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1",
-    # iPhone iOS 17 - Chrome Mobile
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/134.0.0.0 Mobile/15E148 Safari/604.1",
-    # Android 14 (Samsung Galaxy) - Chrome Mobile
-    "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36",
-    # Android 14 (Google Pixel) - Chrome Mobile
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36"
+# macOS: Sequoia (15.x), Sonoma (14.x), and Ventura (13.x)
+MAC_UAS = [
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Firefox/150.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:143.0) Gecko/20100101 Firefox/143.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0"
 ]
 
-# Allow custom UA overrides via environment variables
-DESKTOP_UAS = parse_list("DESKTOP_USER_AGENTS", DEFAULT_DESKTOP_UAS)
-MOBILE_UAS = parse_list("MOBILE_USER_AGENTS", DEFAULT_MOBILE_UAS)
+# Linux Desktop (Ubuntu, Fedora, generic x86_64)
+LINUX_UAS = [
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0",
+    "Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:146.0) Gecko/20100101 Firefox/146.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+]
+
+# iPhone across iOS 18, 17, and 16
+IPHONE_UAS = [
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_7_10 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/150.0.0.0 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/146.0.0.0 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/148.0 Mobile/15E148 Safari/605.1.15"
+]
+
+# Android across versions 15, 14, 13, and 12 on Samsung, Pixel, OnePlus, Xiaomi
+ANDROID_UAS = [
+    # Android 15 - Google Pixel 9 Pro
+    "Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+    # Android 14 - Samsung Galaxy S24 Ultra
+    "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36",
+    # Android 14 - Google Pixel 8
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
+    # Android 13 - Samsung Galaxy S23
+    "Mozilla/5.0 (Linux; Android 13; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36",
+    # Android 13 - Xiaomi 13 Pro
+    "Mozilla/5.0 (Linux; Android 13; 2210132G) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36",
+    # Android 12 - Samsung Galaxy S22
+    "Mozilla/5.0 (Linux; Android 12; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36",
+    # Android 14 - OnePlus 12
+    "Mozilla/5.0 (Linux; Android 14; CPH2573) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36",
+    # Android 14 - Samsung Browser on Galaxy A55
+    "Mozilla/5.0 (Linux; Android 14; SM-A556B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36"
+]
+
+# Custom User-Agent lists if provided
+CUSTOM_DESKTOP_UAS = parse_list("DESKTOP_USER_AGENTS", [])
+CUSTOM_MOBILE_UAS = parse_list("MOBILE_USER_AGENTS", [])
+
+
+def pick_desktop_ua():
+    """66% Windows, 30% macOS, 4% Linux."""
+    if CUSTOM_DESKTOP_UAS:
+        return random.choice(CUSTOM_DESKTOP_UAS), "Custom-Desktop"
+
+    roll = random.random()
+    if roll < 0.04:  # Exactly 4% Linux
+        return random.choice(LINUX_UAS), "Linux"
+    elif roll < 0.34:  # 30% macOS
+        return random.choice(MAC_UAS), "macOS"
+    else:  # 66% Windows
+        return random.choice(WINDOWS_UAS), "Windows"
+
+
+def pick_mobile_ua():
+    """40% iPhone (iOS), 60% Android."""
+    if CUSTOM_MOBILE_UAS:
+        return random.choice(CUSTOM_MOBILE_UAS), "Custom-Mobile"
+
+    if random.random() < 0.40:  # 40% iPhone
+        return random.choice(IPHONE_UAS), "iOS"
+    else:  # 60% Android
+        return random.choice(ANDROID_UAS), "Android"
 
 
 # ---------------------------------------------------------
@@ -245,19 +312,12 @@ def execute_bot(bot_id: int, total_bots: int, target_url: str, slug: str, ltype:
     tier, label, code = pick_country()
     chosen_device = random.choice(DEVICE_TYPES)
 
-    # Select explicit User-Agent and friendly OS label
+    # Pick specific UA and OS
     if chosen_device == "mobile":
-        selected_ua = random.choice(MOBILE_UAS)
-        os_label = "iOS" if "iPhone" in selected_ua else "Android"
+        selected_ua, os_label = pick_mobile_ua()
     else:
         chosen_device = "desktop"
-        selected_ua = random.choice(DESKTOP_UAS)
-        if "Windows" in selected_ua:
-            os_label = "Windows"
-        elif "Macintosh" in selected_ua:
-            os_label = "macOS"
-        else:
-            os_label = "Desktop"
+        selected_ua, os_label = pick_desktop_ua()
 
     # ScraperAPI query parameters
     params = {
@@ -319,8 +379,8 @@ def main():
     print(f"Total Active Keys    : {len(pool.active_keys)}")
     print(f"Browser Rendering    : {BROWSER_RENDERING}")
     print(f"Device Types Allowed : {DEVICE_TYPES}")
-    print(f"Desktop UA Count     : {len(DESKTOP_UAS)} registered")
-    print(f"Mobile UA Count      : {len(MOBILE_UAS)} registered")
+    print(f"Desktop Routing      : 66% Windows, 30% macOS (13-15), 4% Linux")
+    print(f"Mobile Routing       : 40% iPhone (iOS 16-18), 60% Android (12-15)")
     print(f"Configured Referrers : {len(REFERRERS)} options (including direct/none)")
     print(f"Workers Per Cycle    : {int(WORKER_MIN)} - {int(WORKER_MAX)}")
     print(f"Worker Gap Range     : {GAP_MIN:.1f}s - {GAP_MAX:.1f}s")
