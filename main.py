@@ -29,6 +29,14 @@ def parse_range(var_name: str, default_min: float, default_max: float):
 
 
 def parse_referrers(var_name: str, defaults: list):
+    raw_val = os.getenv(var_name, "")
+    if not raw_val.strip():
+        return defaults
+    items = [item.strip() for item in raw_val.split(",")]
+    return items if items else defaults
+
+
+def parse_list(var_name: str, defaults: list):
     raw_val = os.getenv(var_name, "").strip()
     if not raw_val:
         return defaults
@@ -36,36 +44,49 @@ def parse_referrers(var_name: str, defaults: list):
     return items if items else defaults
 
 
-# ScraperAPI Credentials & Bot Behavior (Supports SCRAPERAPI_KEYS or fallback SCRAPINGANT_API_KEYS)
+# ---------------------------------------------------------
+# Environment Variables & Defaults
+# ---------------------------------------------------------
+# API Keys (Checks API_KEYS -> SCRAPERAPI_KEYS -> SCRAPINGANT_API_KEYS)
 RAW_KEYS = os.getenv(
-    "SCRAPERAPI_KEYS",
-    os.getenv("SCRAPINGANT_API_KEYS", "Key1:081130f37f19d409c438e3b29a73421c")
+    "API_KEYS",
+    os.getenv("SCRAPERAPI_KEYS", os.getenv("SCRAPINGANT_API_KEYS", "Key1:081130f37f19d409c438e3b29a73421c"))
 )
-WORKER_MIN, WORKER_MAX = parse_range("WORKER_COUNT_RANGE", 6, 8)
-GAP_MIN, GAP_MAX = parse_range("WORKER_GAP_RANGE", 5.0, 9.0)
-CYCLE_MIN, CYCLE_MAX = parse_range("CYCLE_INTERVAL_RANGE", 55.0, 70.0)
 
-# Browser Rendering Toggle (ScraperAPI uses render=true/false)
+# Ranges
+WORKER_MIN, WORKER_MAX = parse_range("WORKER_COUNT_RANGE", 5, 7)
+GAP_MIN, GAP_MAX = parse_range("WORKER_GAP_RANGE", 8.0, 12.0)
+CYCLE_MIN, CYCLE_MAX = parse_range("CYCLE_INTERVAL_RANGE", 50.0, 70.0)
+
+# Browser Rendering Toggle ("true" or "false")
 BROWSER_RENDERING = os.getenv("BROWSER_RENDERING", "true").strip().lower()
 
-# Default Referrers (Google, Facebook, and Internal app links)
+# Device Types Configuration
+# Defaults to both ('desktop', 'mobile') so any can be picked randomly.
+# If configured with 1 (e.g., 'mobile'), it locks to that one.
+# If configured with comma-separated list (e.g., 'desktop,mobile'), it picks from those.
+DEFAULT_DEVICES = ["desktop", "mobile"]
+DEVICE_TYPES = parse_list("DEVICE_TYPE", DEFAULT_DEVICES)
+
+# Default Referrers (Includes "none" for direct traffic)
 DEFAULT_REFERRERS = [
+    "none",
     "https://app.bullpen.fi/",
     "https://bullpen.fi/",
     "https://www.google.com/",
     "https://www.facebook.com/"
 ]
-
-# Parsed Referrer Pool (Custom comma-separated list via env or defaults)
 REFERRERS = parse_referrers("REFERRERS", DEFAULT_REFERRERS)
 
-# Target slugs
-SLUGS = [
+# Target URLs / Slugs
+DEFAULT_SLUGS = [
     "jack", "6DNUvqf", "652HU1t", "tzlMgCf", "fNPZlqT",
     "bTi9oJs", "QMOvAAL", "OVMrJe2", "VQH8P3L", "xDVN1Bq", "CLfcNh1"
 ]
+SLUGS = parse_list("TARGET_SLUGS", DEFAULT_SLUGS)
+CUSTOM_DIRECT_URLS = parse_list("TARGET_URLS", [])
 
-# Supported ScraperAPI Country Codes (lower-case 2-letter ISO)
+# Supported ScraperAPI Country Codes
 TIER_1 = [
     ("FR", "fr"), ("DE", "de"), ("NL", "nl"), ("ES", "es"),
     ("IT", "it"), ("PL", "pl"), ("SE", "se"), ("BR", "br"),
@@ -147,8 +168,15 @@ pool = KeyPoolManager(RAW_KEYS)
 # Dynamic Links & Routing
 # ---------------------------------------------------------
 def generate_cycle_links(worker_count: int):
-    selected_slugs = random.sample(SLUGS, min(worker_count, len(SLUGS)))
     tasks = []
+    if CUSTOM_DIRECT_URLS:
+        sample_size = min(worker_count, len(CUSTOM_DIRECT_URLS))
+        chosen_urls = random.sample(CUSTOM_DIRECT_URLS, sample_size)
+        for url in chosen_urls:
+            tasks.append((url, "custom", "CUSTOM (URL)"))
+        return tasks
+
+    selected_slugs = random.sample(SLUGS, min(worker_count, len(SLUGS)))
     for slug in selected_slugs:
         if random.random() < 0.86:
             url = f"https://app.bullpen.fi?via={slug}"
@@ -181,6 +209,7 @@ def execute_bot(bot_id: int, total_bots: int, target_url: str, slug: str, ltype:
         return
 
     tier, label, code = pick_country()
+    chosen_device = random.choice(DEVICE_TYPES).lower()
     
     # ScraperAPI query parameters
     params = {
@@ -188,23 +217,27 @@ def execute_bot(bot_id: int, total_bots: int, target_url: str, slug: str, ltype:
         "url": target_url,
         "render": BROWSER_RENDERING,
         "country_code": code,
+        "device_type": chosen_device,
         "keep_headers": "true"
     }
 
     url = f"http://api.scraperapi.com?{urllib.parse.urlencode(params)}"
     
-    # Pick a random referrer on every request
+    # Pick a random referrer
     chosen_referrer = random.choice(REFERRERS)
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Referer": chosen_referrer
-    }
+    headers = {}
+
+    if chosen_referrer and chosen_referrer.lower() not in ("none", "direct", "empty"):
+        headers["Referer"] = chosen_referrer
+        ref_display = chosen_referrer
+    else:
+        ref_display = "None (Direct)"
 
     req = urllib.request.Request(url, headers=headers)
 
     try:
         with urllib.request.urlopen(req, timeout=65) as resp:
-            print(f"[Bot-{bot_id}/{total_bots}] [{tier}-{label}] [{ltype} {slug}] [Ref: {chosen_referrer}] [{key_obj.tag}] -> HTTP {resp.status} OK")
+            print(f"[Bot-{bot_id}/{total_bots}] [{tier}-{label}] [{chosen_device.upper()}] [{ltype} {slug}] [Ref: {ref_display}] [{key_obj.tag}] -> HTTP {resp.status} OK")
 
     except urllib.error.HTTPError as e:
         raw_detail = e.read().decode("utf-8", errors="ignore")[:70].strip()
@@ -217,7 +250,7 @@ def execute_bot(bot_id: int, total_bots: int, target_url: str, slug: str, ltype:
         elif e.code == 404:
             print(f"[Bot-{bot_id}] [{key_obj.tag}] [TRANSIENT] HTTP 404 Route unreachable: {raw_detail}")
         elif e.code == 500:
-            print(f"[Bot-{bot_id}] [{key_obj.tag}] [TRANSIENT] HTTP 500 ScraperAPI Failed to render/reach destination: {raw_detail}")
+            print(f"[Bot-{bot_id}] [{key_obj.tag}] [TRANSIENT] HTTP 500 ScraperAPI upstream error: {raw_detail}")
         else:
             print(f"[Bot-{bot_id}] [{key_obj.tag}] [WARNING] HTTP {e.code}: {raw_detail}")
 
@@ -232,14 +265,19 @@ def execute_bot(bot_id: int, total_bots: int, target_url: str, slug: str, ltype:
 # ---------------------------------------------------------
 def main():
     print("==================================================")
-    print("   SCRAPERAPI ENGINE INITIALIZED (RAILWAY/RENDER) ")
+    print("   SCRAPER ENGINE INITIALIZED (RAILWAY/RENDER)    ")
     print("==================================================")
     print(f"Total Active Keys    : {len(pool.active_keys)}")
     print(f"Browser Rendering    : {BROWSER_RENDERING}")
-    print(f"Configured Referrers : {len(REFERRERS)}")
+    print(f"Device Types Allowed : {', '.join(DEVICE_TYPES)}")
+    print(f"Configured Referrers : {len(REFERRERS)} options (including direct/none)")
     print(f"Workers Per Cycle    : {int(WORKER_MIN)} - {int(WORKER_MAX)}")
     print(f"Worker Gap Range     : {GAP_MIN:.1f}s - {GAP_MAX:.1f}s")
     print(f"Cycle Duration Range : {CYCLE_MIN:.1f}s - {CYCLE_MAX:.1f}s")
+    if CUSTOM_DIRECT_URLS:
+        print(f"Target Mode          : Custom URLs ({len(CUSTOM_DIRECT_URLS)} targets)")
+    else:
+        print(f"Target Mode          : Slugs ({len(SLUGS)} targets)")
     print("==================================================\n")
 
     cycle_num = 1
@@ -250,7 +288,7 @@ def main():
                 print("\n" + "!" * 70)
                 print(" [SHUTDOWN] ALL CONFIGURED KEYS ARE COMPLETELY DEAD / EXHAUSTED.")
                 pool.print_pinned_status()
-                print(" Process exiting now. Update SCRAPERAPI_KEYS to resume.")
+                print(" Process exiting now. Update API_KEYS to resume.")
                 print("!" * 70 + "\n")
                 sys.exit(0)
 
