@@ -37,23 +37,27 @@ def parse_referrers(var_name: str, defaults: list):
 
 
 def parse_list(var_name: str, defaults: list):
+    # Check singular and plural variable names
     raw_val = os.getenv(var_name, "").strip()
+    if not raw_val and not var_name.endswith("S"):
+        raw_val = os.getenv(f"{var_name}S", "").strip()
+    elif not raw_val and var_name.endswith("S"):
+        raw_val = os.getenv(var_name[:-1], "").strip()
+
     if not raw_val:
         return defaults
-    items = [item.strip() for item in raw_val.split(",") if item.strip()]
+    items = [item.strip().lower() for item in raw_val.split(",") if item.strip()]
     return items if items else defaults
 
 
 # ---------------------------------------------------------
 # Environment Variables & Defaults
 # ---------------------------------------------------------
-# API Keys (Checks API_KEYS -> SCRAPERAPI_KEYS -> SCRAPINGANT_API_KEYS)
 RAW_KEYS = os.getenv(
     "API_KEYS",
     os.getenv("SCRAPERAPI_KEYS", os.getenv("SCRAPINGANT_API_KEYS", "Key1:081130f37f19d409c438e3b29a73421c"))
 )
 
-# Ranges
 WORKER_MIN, WORKER_MAX = parse_range("WORKER_COUNT_RANGE", 5, 7)
 GAP_MIN, GAP_MAX = parse_range("WORKER_GAP_RANGE", 8.0, 12.0)
 CYCLE_MIN, CYCLE_MAX = parse_range("CYCLE_INTERVAL_RANGE", 50.0, 70.0)
@@ -61,10 +65,7 @@ CYCLE_MIN, CYCLE_MAX = parse_range("CYCLE_INTERVAL_RANGE", 50.0, 70.0)
 # Browser Rendering Toggle ("true" or "false")
 BROWSER_RENDERING = os.getenv("BROWSER_RENDERING", "true").strip().lower()
 
-# Device Types Configuration
-# Defaults to both ('desktop', 'mobile') so any can be picked randomly.
-# If configured with 1 (e.g., 'mobile'), it locks to that one.
-# If configured with comma-separated list (e.g., 'desktop,mobile'), it picks from those.
+# Device Types: Reads DEVICE_TYPE or DEVICE_TYPES (e.g. "mobile" or "desktop,mobile")
 DEFAULT_DEVICES = ["desktop", "mobile"]
 DEVICE_TYPES = parse_list("DEVICE_TYPE", DEFAULT_DEVICES)
 
@@ -209,30 +210,29 @@ def execute_bot(bot_id: int, total_bots: int, target_url: str, slug: str, ltype:
         return
 
     tier, label, code = pick_country()
-    chosen_device = random.choice(DEVICE_TYPES).lower()
-    
+    chosen_device = random.choice(DEVICE_TYPES)
+
     # ScraperAPI query parameters
     params = {
         "api_key": key_obj.token,
         "url": target_url,
         "render": BROWSER_RENDERING,
         "country_code": code,
-        "device_type": chosen_device,
-        "keep_headers": "true"
+        "device_type": chosen_device
     }
 
-    url = f"http://api.scraperapi.com?{urllib.parse.urlencode(params)}"
-    
     # Pick a random referrer
     chosen_referrer = random.choice(REFERRERS)
     headers = {}
 
     if chosen_referrer and chosen_referrer.lower() not in ("none", "direct", "empty"):
         headers["Referer"] = chosen_referrer
+        params["keep_headers"] = "true"
         ref_display = chosen_referrer
     else:
         ref_display = "None (Direct)"
 
+    url = f"http://api.scraperapi.com?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url, headers=headers)
 
     try:
@@ -269,7 +269,7 @@ def main():
     print("==================================================")
     print(f"Total Active Keys    : {len(pool.active_keys)}")
     print(f"Browser Rendering    : {BROWSER_RENDERING}")
-    print(f"Device Types Allowed : {', '.join(DEVICE_TYPES)}")
+    print(f"Device Types Allowed : {DEVICE_TYPES}")
     print(f"Configured Referrers : {len(REFERRERS)} options (including direct/none)")
     print(f"Workers Per Cycle    : {int(WORKER_MIN)} - {int(WORKER_MAX)}")
     print(f"Worker Gap Range     : {GAP_MIN:.1f}s - {GAP_MAX:.1f}s")
